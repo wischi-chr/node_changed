@@ -1,0 +1,8 @@
+//ignore following mods (because they do not manipulate nodes)
+dye
+util
+areas
+sethome
+datastorage
+screwdriver
+no_sneak_glitch

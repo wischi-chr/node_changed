@@ -1,5 +1,95 @@
 local fix_missing_callbacks = false
+local crash_on_error = true
+local crash_hard = false
+
 local registered_callbacks = {}
+local node_changed_path = minetest.get_modpath("node_changed")
+local mods
+local dep_tree = {}
+
+local table_from_file = function(filename)
+	local f=io.open(filename,"r")
+	if not f then return nil end
+	local t = {}
+	while true do
+		local line = f:read("*line")
+		if line == nil then break end
+		table.insert(t,line)
+	end
+	io.close(f)
+	return t
+end
+
+local ex = {}
+ex["node_changed"] = true
+
+local ex_file = table_from_file(node_changed_path.."/exceptions.txt")
+if ex_file then
+	for i = 1,#ex_file do
+		ex[ex_file[i]] = true
+	end
+end
+
+-- loads a single mod into the tree
+local load_mod = function(mod)
+	local path = minetest.get_modpath(mod)
+	if not path then return end
+	
+	local mdep = table_from_file(path.."/depends.txt")
+	if not mdep then return end
+	
+	for i = 1,#mdep do
+		local line = mdep[i]
+		if string.sub(line,-1) == "?" then
+			line = string.sub(line,1,string.len(line)-1)
+		end
+		if dep_tree[line] then
+			table.insert(dep_tree[mod],line)
+		end
+	end
+end
+
+-- load entire mod dependency tree
+local load_mod_tree = function()
+	mods = minetest.get_modnames()
+	for i, name in ipairs(mods) do dep_tree[name] = {} end
+	for i, name in ipairs(mods) do load_mod(name) end
+end
+
+-- 
+local get_tree_roots = function()
+	local res = {}
+	for k,v in pairs(dep_tree) do
+		if #v < 1 and not ex[k] then table.insert(res,k) end
+	end
+	return res
+end
+
+load_mod_tree();
+local roots = get_tree_roots()
+if roots and #roots > 0 then
+	print("")
+	print("=========================================================")
+	print("ERROR: The following mods may load before 'node_changed':")
+	print(table.concat(roots, ", "))
+	print("=========================================================")
+	print("")
+	if crash_on_error then
+		if crash_hard then error() end
+		print(""..nil)
+	end
+end
+
+
+
+
+
+
+
+
+
+
+
 
 local orig_register_node = minetest.register_node
 local orig_set_node = minetest.set_node
